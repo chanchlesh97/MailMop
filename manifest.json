@@ -38,7 +38,10 @@
   "oauth2": {
     "client_id": "962093811149-smh0eon2puomu1m7gd29ie3c27hu1l7k.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/gmail.modify"
+      "https://www.googleapis.com/auth/gmail.modify",
+      "openid",
+      "email",
+      "profile"
     ]
   }
 

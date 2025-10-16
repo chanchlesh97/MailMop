@@ -59,14 +59,45 @@ function storageRemove(key) {
 
 async function signIn() {
   // Request interactive token (shows consent if needed)
-  const token = await getAuthTokenInteractive(true);
+  let token = await getAuthTokenInteractive(true);
   const obtainedAt = Date.now();
   // Fetch basic profile to get email
-  const resp = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+  // Fetch basic profile to get email. If the token was invalid, retry once with a refreshed token.
+  let resp = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
     headers: { Authorization: `Bearer ${token}` },
   });
+  if (resp.status === 401) {
+    // try to remove cached token and obtain a refreshed one
+    try {
+      await removeCachedAuthToken(token);
+      const fresh = await getAuthTokenInteractive(true);
+      // replace token for persistence
+      token = fresh;
+      resp = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (e) {
+      throw new Error(
+        "Authentication failed while refreshing token: " + e.message
+      );
+    }
+  }
   const profile = await resp.json();
-  const auth = { token, obtainedAt, email: profile.email };
+  if (resp.status === 401 || profile.error || !profile.email) {
+    // Provide a clearer message including status and any server message
+    const msg =
+      profile && profile.error
+        ? JSON.stringify(profile)
+        : `HTTP ${resp.status}`;
+    throw new Error("Failed to fetch user profile: " + msg);
+  }
+  const auth = {
+    token,
+    obtainedAt,
+    email: profile.email,
+    name: profile.name,
+    picture: profile.picture,
+  };
   await storageSet("auth", auth);
   return auth;
 }
@@ -100,16 +131,32 @@ async function getAccessToken({
   }
 
   // Try to get a token (may prompt if interactive=true)
-  const token = await getAuthTokenInteractive(interactive);
+  let token = await getAuthTokenInteractive(interactive);
   // Update storage
   const auth = { token, obtainedAt: Date.now() };
   // try to fetch email if missing
   try {
-    const resp = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    let resp = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const profile = await resp.json();
+    if (resp.status === 401) {
+      // refresh token and retry once
+      try {
+        await removeCachedAuthToken(token);
+        const fresh = await getAuthTokenInteractive(true);
+        token = fresh;
+        resp = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch (e) {
+        // swallow and proceed without profile
+        resp = { status: 401 };
+      }
+    }
+    const profile = await (resp.json ? resp.json() : Promise.resolve(null));
     if (profile && profile.email) auth.email = profile.email;
+    if (profile && profile.name) auth.name = profile.name;
+    if (profile && profile.picture) auth.picture = profile.picture;
   } catch (e) {
     // ignore profile errors
   }
@@ -150,7 +197,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         const auth = await getStoredAuth();
         if (auth && (auth.email || auth.token)) {
           // Consider token presence as signed-in even if email lookup failed
-          sendResponse({ signedIn: true, email: auth.email });
+          sendResponse({
+            signedIn: true,
+            email: auth.email,
+            name: auth.name,
+            picture: auth.picture,
+          });
         } else {
           sendResponse({ signedIn: false });
         }
