@@ -10,27 +10,60 @@
     <div id="app">
       <header>
         <h1>MailMop</h1>
+        <div id="user-info" class="user-info hidden"></div>
+        <button id="sign-out" class="sign-out hidden">Sign out</button>
       </header>
 
       <main>
         <section id="auth-section">
           <button id="sign-in">Sign in with Google</button>
-          <div id="user-info" style="display:none"></div>
+          <button id="sign-out" style="display:none">Sign out</button>
+          <div id="status" class="status"></div>
         </section>
 
-        <section id="search-section" style="display:none">
-          <label>Query (e.g., from:news@example.com):</label>
-          <input id="query" type="text" placeholder="from:someone@domain.com" />
-          <button id="search">Search</button>
-          <div id="results"></div>
+  <section id="search-section" class="hidden">
+          <div class="row">
+            <label for="from">From</label>
+            <input id="from" type="text" placeholder="sender@example.com" />
+          </div>
+          <div class="row">
+            <label for="older">Older than</label>
+            <select id="older">
+              <option value="">any</option>
+              <option value="7d">7 days</option>
+              <option value="30d">30 days</option>
+              <option value="90d">90 days</option>
+              <option value="1y">1 year</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="category">Category</label>
+            <select id="category">
+              <option value="">any</option>
+              <option value="primary">Primary</option>
+              <option value="social">Social</option>
+              <option value="promotions">Promotions</option>
+              <option value="updates">Updates</option>
+              <option value="forums">Forums</option>
+            </select>
+          </div>
+
+          <div class="actions">
+            <button id="search">Search</button>
+            <button id="select-all" disabled>Select All</button>
+            <button id="delete-selected" disabled>Delete Selected</button>
+          </div>
+
+          <div id="results" class="results"></div>
         </section>
       </main>
 
       <footer>
-        <small>MailMop — preview-only skeleton</small>
+        <small>MailMop — client-only bulk cleaner</small>
       </footer>
     </div>
 
+    <script src="gmailClient.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>
