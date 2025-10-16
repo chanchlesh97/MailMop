@@ -30,6 +30,33 @@ function removeCachedAuthToken(token) {
   });
 }
 
+// Promisified storage helpers
+function storageGet(key) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(key, (items) => {
+      resolve(items && items[key]);
+    });
+  });
+}
+
+function storageSet(key, value) {
+  return new Promise((resolve, reject) => {
+    try {
+      const obj = {};
+      obj[key] = value;
+      chrome.storage.local.set(obj, () => resolve());
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+function storageRemove(key) {
+  return new Promise((resolve) => {
+    chrome.storage.local.remove(key, () => resolve());
+  });
+}
+
 async function signIn() {
   // Request interactive token (shows consent if needed)
   const token = await getAuthTokenInteractive(true);
@@ -40,23 +67,21 @@ async function signIn() {
   });
   const profile = await resp.json();
   const auth = { token, obtainedAt, email: profile.email };
-  await chrome.storage.local.set({ auth });
+  await storageSet("auth", auth);
   return auth;
 }
 
 async function signOut() {
   // Remove cached token and clear storage
-  const items = await chrome.storage.local.get("auth");
-  const auth = items && items.auth;
+  const auth = await storageGet("auth");
   if (auth && auth.token) {
     await removeCachedAuthToken(auth.token);
   }
-  await chrome.storage.local.remove("auth");
+  await storageRemove("auth");
 }
 
 async function getStoredAuth() {
-  const items = await chrome.storage.local.get("auth");
-  return items && items.auth;
+  return await storageGet("auth");
 }
 
 async function getAccessToken({
@@ -88,7 +113,7 @@ async function getAccessToken({
   } catch (e) {
     // ignore profile errors
   }
-  await chrome.storage.local.set({ auth });
+  await storageSet("auth", auth);
   return token;
 }
 
@@ -123,7 +148,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         const auth = await getStoredAuth();
-        if (auth && auth.email) {
+        if (auth && (auth.email || auth.token)) {
+          // Consider token presence as signed-in even if email lookup failed
           sendResponse({ signedIn: true, email: auth.email });
         } else {
           sendResponse({ signedIn: false });

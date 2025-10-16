@@ -21,6 +21,7 @@ module.exports = {
         { from: "options.html", to: "." },
         { from: "styles.css", to: "." },
         { from: "contentScript.js", to: "." },
+        { from: "gmailClient.js", to: "." },
         { from: "icons", to: "icons" },
       ],
     }),
